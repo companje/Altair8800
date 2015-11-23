@@ -32,6 +32,10 @@ public:
   boolean onRelease(ControlKey c) {
     return (_cx & (1<<c)) > 0 && (cx & (1<<c)) == 0;
   }
+
+  boolean isDown(ControlKey c) {
+    return cx & (1<<c);
+  } 
   
   boolean onRun() { return onRelease(RUN); }
   boolean onStop() { return onRelease(STOP); }

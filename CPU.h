@@ -6,6 +6,8 @@
 #define VECTOR(x) (x >> 3 & 7)
 #define RP(x) (x >> 4 & 3)
 
+const byte instruction_length[] = { 1,3,1,1,1,1,2,1,1,1,1,1,1,1,2,1,1,3,1,1,1,1,2,1,1,1,1,1,1,1,2,1,1,3,3,1,1,1,2,1,1,1,3,1,1,1,2,1,1,3,3,1,1,1,2,1,1,1,3,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,3,3,1,2,1,1,1,3,3,3,3,2,1,1,1,3,2,3,1,2,1,1,1,3,2,3,3,2,1,1,1,3,1,3,1,2,1,1,1,3,1,3,3,2,1,1,1,3,1,3,1,2,1,1,1,3,1,3,3,2,1 };
+
 class CPU {
 public:
   boolean m1 = true; //Machine Cycle 1, fetching an opcode
@@ -13,7 +15,8 @@ public:
   boolean stack = false; //on when using the stack (push, pop, ...)
   boolean wait = true;
   byte opcode = 0; // the last fetched opcode
-  
+  byte db,lb,hb;
+ 
   enum Flag { CARRY=1, PARITY=4, HALF=16, IF=32, ZERO=64, SIGN=128 };
   enum Condition { NZ,Z,NC,CC,PO,PE,P,M }; //NZ=!zero, Z=zero, NC=!carry, C=Carry, PO=parity odd, PE=parity even, P=!sign = positive, M=sign = minus/negative 
   enum Register {B,C,D,E,H,L,MEM,A };
@@ -22,11 +25,12 @@ public:
   union { uint16_t af; struct { byte flags, a; }; };  //a=accumulator,  //f=flags (S Z 0 A 0 P 1 C), S=sign, Z=zero, A=aux-carry, P=parity, C=carry 
   union { uint16_t bc; struct { byte b, c; }; }; 
   union { uint16_t de; struct { byte e, d; }; }; 
-  union { uint16_t hl; struct { byte l, h; }; };
+  union { uint16_t hl; struct { byte l, h; }; }; 
   
+
   uint16_t sp; //stack pointer
   uint16_t pc; //program counter
-  
+    
   byte read8(uint16_t addr) {
     byte val = RAM.read(addr);
 //    LOG("%04x: %02x",addr,val);
@@ -54,7 +58,7 @@ public:
   }
   
   byte getFlag(byte flag) {
-    return flags & flag;
+    return !!(flags & flag); //does not return (0 or 1) but (0 or flag)
   }
   
   void clearFlag(byte flag) {
@@ -117,18 +121,18 @@ public:
   
   void gensub(byte val) { //generic subtract
     uint16_t aa,bb;
-    a = a;
-    b = 0x100 - val;
-    setFlag(HALF, checkHalfCarry(a,b));
-    setFlag(CARRY, checkCarry(a,b));
-    a += b;
-    a = a & 0xff;
+    aa = a;
+    bb = 0x100 - val;
+    setFlag(HALF, checkHalfCarry(aa,bb));
+    setFlag(CARRY, checkCarry(aa,bb));
+    aa += bb;
+    a = aa & 0xff; //update accumulator
     updateFlags(A, ZERO | SIGN | PARITY | CARRY | HALF);
   }
   
   void genadd(byte val) { //generic add
-    setFlag(HALF,checkHalfCarry(a,val));
-    setFlag(CARRY, (a,val));
+    setFlag(HALF, checkHalfCarry(a,val));
+    setFlag(CARRY, checkCarry(a,val));
     a += val;
     updateFlags(A, ZERO | SIGN | PARITY | CARRY | HALF);
   }
@@ -136,6 +140,7 @@ public:
   void compare(byte val) {
     byte tmp = a;
     gensub(val);
+    //LOG("%04x: compare: a=val (%02x - %02x) = %02x (ZERO=%d)",pc,tmp,val,a,getFlag(ZERO));
     a = tmp; //restore a 
   }
   
@@ -144,7 +149,7 @@ public:
     if (mask & PARITY) setFlag(PARITY,getParity(val));
     if (mask & HALF) { /*TODO?*/ }
     if (mask & IF) { /*TODO?*/ }
-    if (mask & ZERO) setFlag(ZERO,val);
+    if (mask & ZERO) setFlag(ZERO,val==0);
     if (mask & SIGN) setFlag(SIGN,val & 0x80);
   }
   
@@ -217,6 +222,7 @@ public:
     setRegister(DEST(opcode), val + 0xff);
     updateFlags(DEST(opcode), ZERO | SIGN | CARRY | HALF); //no parity check here?
     pc++;
+    //LOG("dcr: val=%02x",val + 0xff);
   } //Decrement register
   
   void dcx() { setRegisterPair(RP(opcode), getRegisterPair(RP(opcode)-1));  pc++; } //Decrement register pair
@@ -224,11 +230,11 @@ public:
   void ei() { pc++; setFlag(IF); } //Enable interrupts
   void hlt() { wait = true; } //Halt processor
   
-  void inp() { //Read input port into A
+  void in() { //Read input port into A
     byte port = read8(pc+1);
     switch (port) {
       case 0x00: a = Serial.available()==0; break; //negative logic
-      case 0x01: a = Serial.read(); break;
+      case 0x01: a = Serial.read(); break; //Serial.write(a); 
       case 0xff: a = Switches.ax >> 8; break;
       default: a = 0xff;
     }
@@ -271,20 +277,19 @@ public:
   void ral() { uint16_t hi = a & 0x80; a <<= 1; if (getFlag(CARRY)) a |= 1; else a &= ~1; setFlag(CARRY,hi); pc++; } //Rotate A left through carry
   void rar() { uint16_t lo = a & 1; a >>= 1; if (getFlag(CARRY)) a |= 0x80; else a &= ~0x80; setFlag(CARRY,lo); pc++; } //Rotate A right through carry
   void rccc() { if (checkCondition(CONDITION(opcode))) ret(); else pc++; } //Conditional return from subroutine
-  void ret() { pc = read16(sp); sp+=2; Serial.println(pc); }; //Unconditional return from subroutine
+  void ret() { pc = read16(sp); sp+=2; }; //Unconditional return from subroutine
   void rlc() { uint16_t hi = a & 0x80; a <<= 1; setFlag(CARRY,hi); if (hi) a |= 1; else a &= ~1; pc++; } //Rotate A left
   void rrc() { uint16_t lo = a & 1; a >>= 1; setFlag(CARRY,lo); if (lo) a |= 0x80; else a &= ~0x80; pc++; } //Rotate A right
-  //LOG("rrc:%02x",a);
-  void rst() { sp-=2; write16(sp,pc); pc = DEST(opcode)*8; } //Restart (Call n*8) ////// CHECKME (this was ...,pc+1);
-  void sbb() { Serial.println("TODO SBB"); } //Subtract register from A with borrow
-  void sbi() { Serial.println("TODO SBI");} //Subtract immediate from A with borrow
+  void rst() { sp-=2; write16(sp,pc+1); pc = DEST(opcode)*8; } //Restart (Call n*8)
+  void sbb() { uint16_t val = getRegister(SOURCE(opcode)); if (getFlag(CARRY)) val++; gensub(val); pc++; } //Subtract register from A with borrow
+  void sbi() { uint16_t val = read8(pc+1); if (getFlag(CARRY)) val++; gensub(val); pc+=2; } //Subtract immediate from A with borrow
   void shld() { write16(read16(pc+1), hl); pc+=3; } //Store H:L to memory
   void sphl() { sp=hl; pc++; } //Set SP to content of H:L
   void sta() { write16(read16(pc+1),a); pc+=3; } //Store A to memory
   void stax() { write8(getRegisterPair(RP(opcode)),a); pc++; } //Store indirect through BC or DE // TODO: only BC and DE allowed for indirect
   void stc() { setFlag(CARRY); pc++; } //Set  flag
-  void sub() { Serial.println("TODO SUB"); } //Subtract register from A
-  void sui() { Serial.println("TODO SUI"); } //Subtract immediate from A
+  void sub() { byte val = getRegister(SOURCE(opcode)); gensub(val); pc++; } //Subtract register from A
+  void sui() { gensub(read8(pc+1)); pc+=2; } //Subtract immediate from A
   void xchg() { uint16_t tmp=hl; hl=de; de=tmp; pc++; } //Exchange DE and HL content
   void xra() { a ^= getRegister(SOURCE(opcode)); clearFlag(CARRY); clearFlag(HALF); updateFlags(A, ZERO | SIGN | PARITY | CARRY | HALF); pc++; } //XOR register with A
   void xri() { a ^= read8(pc+1); clearFlag(CARRY); clearFlag(HALF); updateFlags(A, ZERO | SIGN | PARITY | CARRY | HALF); pc+=2; } //XOR immediate with A
@@ -292,90 +297,230 @@ public:
 
   void step() { //our step function does whole instruction, not just one byte
   
+    //if interrupts are enabled and there's serial available then call RST
     if ((flags & IF) && Serial.available()) {
       clearFlag(IF); //disable interrupts
       opcode = 0xff;
+      pc--;
       rst();
       return;
-    } else {
-      opcode = read8(pc);
     }
-    
-//    LOG("%04x: %02x",pc,opcode);
+   
+    opcode = read8(pc);
+
 
     switch (opcode) {
-      case 0b11111110: cpi(); return; // cpi #              ZSPCA   Compare immediate with A
-      case 0b11111011: ei(); return; // ei                 -       Enable interrupts
-      case 0b11111001: sphl(); return; // sphl               -       Set SP to content of H:L
-      case 0b11110110: ori(); return; // ori #              ZSPCA   OR  immediate with A
-      case 0b11110011: di(); return; // di                 -       Disable interrupts
-      case 0b11101110: xri(); return; // xri #     db       ZSPCA   ExclusiveOR immediate with A
-      case 0b11101011: xchg(); return; // xchg               -       Exchange DE and HL content
-      case 0b11101001: pchl(); return; // pchl               -       Jump to address in H:L
-      case 0b11100110: ani(); return; // ani #     db       ZSPCA   AND immediate with A
-      case 0b11100011: xthl(); return; // xthl               -       Swap H:L with top word on stack
-      case 0b11011110: sbi(); return; // sbi #     db       ZSCPA   Subtract immediate from A with borrow
-      case 0b11011011: inp(); return; // in p      pa       -       Read input port into A
-      case 0b11010110: sui(); return; // sui #     db       ZSCPA   Subtract immediate from A
-      case 0b11010011: out(); return; // out p     pa       -       Write A to output port
-      case 0b11001110: aci(); return; // aci #     db       ZSCPA   Add immediate to A with carry
-      case 0b11001101: call(); return; // call a    lb hb    -       Unconditional subroutine call
-      case 0b11001001: ret(); return; // ret                -       Unconditional return from subroutine
-      case 0b11000110: adi(); return; // adi #     db       ZSCPA   Add immediate to A
-      case 0b11000011: jmp(); return; // jmp a     lb hb    -       Unconditional jump
-      case 0b01110110: hlt(); return; // hlt                -       Halt processor
-      case 0b00111111: cmc(); return; // cmc                C       Compliment Carry flag
-      case 0b00111010: lda(); return; // lda a     lb hb    -       Load A from memory
-      case 0b00110111: stc(); return; // stc                C       Set Carry flag
-      case 0b00110010: sta(); return; // sta a     lb hb    -       Store A to memory
-      case 0b00101111: cma(); return; // cma                -       Compliment A
-      case 0b00101010: lhld(); return; // lhld a    lb hb    -       Load H:L from memory
-      case 0b00100111: daa(); return; // daa                ZSPCA   Decimal Adjust accumulator
-      case 0b00100010: shld(); return; // shld a    lb hb    -       Store H:L to memory
-      case 0b00011111: rar(); return; // rar                C       Rotate A right through carry
-      case 0b00010111: ral(); return; // ral                C       Rotate A left through carry
-      case 0b00001111: rrc(); return; // rrc                C       Rotate A right
-      case 0b00000111: rlc(); return; // rlc                C       Rotate A left
-      case 0b00000000: nop(); return; // nop                -       No operation
+      case 0x00: return nop();
+      case 0x07: return rlc();
+      case 0x0F: return rrc();
+      case 0x17: return ral();
+      case 0x1F: return rar();
+      case 0x22: return shld();
+      case 0x27: return daa();
+      case 0x2A: return lhld();
+      case 0x2F: return cma();
+      case 0x32: return sta();
+      case 0x37: return stc();
+      case 0x3A: return lda(); 
+      case 0x3F: return cmc(); 
+      case 0x76: return hlt(); 
+      case 0xC3: return jmp(); 
+      case 0xC6: return adi(); 
+      case 0xC9: return ret(); 
+      case 0xCD: return call();
+      case 0xCE: return aci(); 
+      case 0xD3: return out(); 
+      case 0xD6: return sui(); 
+      case 0xDB: return in();  
+      case 0xDE: return sbi();    
+      case 0xE3: return xthl();   
+      case 0xE6: return ani();    
+      case 0xE9: return pchl();   
+      case 0xEB: return xchg();   
+      case 0xEE: return xri();
+      case 0xF3: return di();     
+      case 0xF6: return ori();
+      case 0xF9: return sphl();   
+      case 0xFB: return ei();     
+      case 0xFE: return cpi();    
+    }    
+
+    switch (opcode & 0xF8) {
+      case 0x80: return add();
+      case 0x88: return adc();
+      case 0x90: return sub();    
+      case 0x98: return sbb();   
+      case 0xA0: return ana();  
+      case 0xA8: return xra();
+      case 0xB0: return ora();
+      case 0xB8: return cmp();
     }
-    
-    switch (opcode & 0b11111000) {
-      case 0b10111000: cmp(); return; // cmp s              ZSPCA   Compare register with A
-      case 0b10110000: ora(); return; // ora s              ZSPCA   OR  register with A
-      case 0b10101000: xra(); return; // xra s              ZSPCA   ExclusiveOR register with A
-      case 0b10100000: ana(); return; // ana s              ZSCPA   AND register with A
-      case 0b10011000: sbb(); return; // sbb s              ZSCPA   Subtract register from A with borrow
-      case 0b10010000: sub(); return; // sub s              ZSCPA   Subtract register from A
-      case 0b10001000: adc(); return; // adc s              ZSCPA   Add register to A with carry
-      case 0b10000000: add(); return; // add s              ZSPCA   Add register to A
+
+    switch (opcode & 0xCF) {
+      case 0x01: return lxi(); 
+      case 0x02: return stax();
+      case 0x03: return inx(); 
+      case 0x09: return dad();    
+      case 0x0A: return ldax(); 
+      case 0x0B: return dcx();  
+      case 0xC1: return pop();  
+      case 0xC5: return push();
+    }    
+
+    switch (opcode & 0xC7) {
+      case 0x04: return inr(); 
+      case 0x05: return dcr(); 
+      case 0x06: return mvi(); 
+      case 0xC0: return rccc();   
+      case 0xC2: return jccc();   
+      case 0xC4: return cccc();  
+      case 0xC7: return rst();    
     }
-    
-    switch (opcode & 0b11001111) {
-      case 0b11000101: push(); return; // push rp   *2       -       Push register pair on the stack
-      case 0b11000001: pop(); return; // pop rp    *2       *2      Pop  register pair from the stack
-      case 0b00001011: dcx(); return; // dcx rp             -       Decrement register pair
-      case 0b00001010: ldax(); return; // ldax rp   *1       -       Load indirect through BC or DE
-      case 0b00001001: dad(); return; // dad rp             C       Add register pair to HL (16 bit add)
-      case 0b00000011: inx(); return; // inx rp             -       Increment register pair
-      case 0b00000010: stax(); return; // stax rp   *1       -       Store indirect through BC or DE
-      case 0b00000001: lxi(); return; // lxi rp,#  lb hb    -       Load register pair immediate
-    }
-    
-    switch (opcode & 0b11000111) {
-      case 0b11000111: rst(); return; // rst n              -       Restart (Call n*8)
-      case 0b11000100: cccc(); return; // cccc a    lb hb    -       Conditional subroutine call
-      case 0b11000010: jccc(); return; // jccc a    lb hb    -       Conditional jump
-      case 0b11000000: rccc(); return; // rccc               -       Conditional return from subroutine
-      case 0b00000110: mvi(); return; // mvi d,#   db       -       Move immediate to register
-      case 0b00000101: dcr(); return; // dcr d              ZSPA    Decrement register
-      case 0b00000100: inr(); return; // inr d              ZSPA    Increment register
-    }
-    
-    switch (opcode & 0b11000000) {
-      case 0b01000000: mov(); return; // mov d,s            -       Move register to register
+
+    switch (opcode & 0xC0) {
+      case 0x40: return mov();
     }
     
     LOG("Unknown opcode: %02x @ %04x",opcode,pc);
   }
+
+  byte rp1() {
+    byte rp[] = "bc,de,hl,sp";
+    return rp[RP(opcode)*3];
+  }
+
+  byte rp2() {
+    byte rp[] = "bc,de,hl,sp";
+    return rp[RP(opcode)*3+1];
+  }
+
+  byte c1() {
+    byte c[] = "nz,z ,nc,c ,po,pe,p ,m ";
+    return c[CONDITION(opcode)*3];
+  }
+
+  byte c2() {
+    byte c[] = "nz,z ,nc,c ,po,pe,p ,m ";
+    return c[CONDITION(opcode)*3+1];
+  }
+
+  byte reg(byte r) {
+    byte s[] = "b,c,d,e,h,l,m,a";
+    return s[r*2]; 
+  }
+
+  byte src() {
+    return reg(SOURCE(opcode));
+  }
+
+  byte dst() {
+    return reg(DEST(opcode));
+  }
+  
+  void printInstruction() {
+    byte opcode = read8(pc);
+    byte len = instruction_length[opcode];
+    byte db,lb,hb;
+    int addr;
+    
+    char buf[100]; 
+    sprintf(buf,"%04X %02X",pc,opcode); 
+    Serial.print(buf);
+    
+    if (len==1) {
+      Serial.print("\t");
+    } else if (len==2) {
+      db = read8(pc+1);
+      sprintf(buf,"%02X",db); 
+      Serial.print(buf);
+    } else if (len==3) {
+      lb = read8(pc+1);
+      hb = read8(pc+2);
+      addr = hb<<8 | lb;
+      sprintf(buf,"%02X%02X",lb,hb); 
+      Serial.print(buf);
+    }
+    
+    Serial.print("\t");
+
+    switch (opcode) {
+      case 0x00: LOG("nop",0);           return;
+      case 0x07: LOG("rlc",0);           return;
+      case 0x0F: LOG("rrc",0);           return;
+      case 0x17: LOG("ral",0);           return;
+      case 0x1F: LOG("rar",0);           return;
+      case 0x22: LOG("shld %04Xh",addr); return;
+      case 0x27: LOG("daa",0);           return;
+      case 0x2A: LOG("lhld %04Xh",addr); return;
+      case 0x2F: LOG("cma",0);           return;
+      case 0x32: LOG("sta %04Xh",addr);  return;
+      case 0x37: LOG("stc",0);           return;
+      case 0x3A: LOG("lda %04Xh",addr);  return;
+      case 0x3F: LOG("cmc",0);           return;
+      case 0x76: LOG("hlt",0);           return;
+      case 0xC3: LOG("jmp %04Xh",addr);  return;
+      case 0xC6: LOG("adi %02Xh",db);    return;
+      case 0xC9: LOG("ret",0);           return;
+      case 0xCD: LOG("call %04Xh",a);    return;
+      case 0xCE: LOG("aci %02Xh",db);    return;
+      case 0xD3: LOG("out %02Xh",db);    return;
+      case 0xD6: LOG("sui %02Xh",db);    return;
+      case 0xDB: LOG("in %02Xh",db);     return;
+      case 0xDE: LOG("sbi %02Xh",db);    return;
+      case 0xE3: LOG("xthl",0);          return;
+      case 0xE6: LOG("ani %02Xh",db);    return;
+      case 0xE9: LOG("pchl",0);          return;
+      case 0xEB: LOG("xchg",0);          return;
+      case 0xEE: LOG("xri %02Xh",db);    return;
+      case 0xF3: LOG("di",0);            return;
+      case 0xF6: LOG("ori %02Xh",db);    return;
+      case 0xF9: LOG("sphl",0);          return;
+      case 0xFB: LOG("ei",0);            return;
+      case 0xFE: LOG("cpi %02Xh",db);    return;
+    }
+    
+    switch (opcode & 0xF8) {
+      case 0x80: LOG("add %c",src());    return;
+      case 0x88: LOG("adc %c",src());    return;
+      case 0x90: LOG("sub %c",src());    return;
+      case 0x98: LOG("sbb %c",src());    return;
+      case 0xA0: LOG("ana %c",src());    return;
+      case 0xA8: LOG("xra %c",src());    return;
+      case 0xB0: LOG("ora %c",src());    return;
+      case 0xB8: LOG("cmp %c",src());    return;
+    }
+    
+    switch (opcode & 0xCF) {
+      case 0x01: LOG("lxi %c%c,%04Xh",rp1(), rp2(), addr); return;
+      case 0x02: LOG("stax %c%c",rp1(),rp2()); return;
+      case 0x03: LOG("inx %c%c",rp1(),rp2());  return;
+      case 0x09: LOG("dad %c%c",rp1(),rp2());  return;
+      case 0x0A: LOG("ldax %c%c",rp1(),rp2()); return;
+      case 0x0B: LOG("dcx %c%c",rp1(),rp2());  return;
+      case 0xC1: LOG("pop %c%c",rp1(),rp2());  return;
+      case 0xC5: LOG("push %c%c",rp1(),rp2()); return;
+    }
+    
+    switch (opcode & 0xC7) {
+      case 0x04: LOG("inr %c",dst());          return;
+      case 0x05: LOG("dcr %c",dst());          return;
+      case 0x06: LOG("mvi %c,%02Xh",dst(),db); return;
+      case 0xC0: LOG("r%c%c",c1(),c2());       return;
+      case 0xC2: LOG("j%c%c %04Xh",c1(),c2(),addr); return;
+      case 0xC4: LOG("c%c%c %04Xh",c1(),c2(),addr); return;
+      case 0xC7: LOG("rst %d",VECTOR(opcode)); return;
+    }
+    
+    switch (opcode & 0xC0) {
+      case 0x40: LOG("mov %c,%c",dst(),src()); return;
+    }
+    
+  }
+
+  void printRegisters() {
+    LOG("registers a=%02X, b=%02X, c=%02X, d=%02X, e=%02X, h=%02X, l=%02X, pc=%04X, sp=%04X",a,b,c,d,e,h,l,pc,sp);
+    LOG("flags: c=%d, z=%d, h=%d",getFlag(CARRY),getFlag(ZERO),getFlag(HALF));
+  }
+
   
 } CPU;

@@ -1,4 +1,0 @@
-// class Disk {
-// public:
-
-// } disk;

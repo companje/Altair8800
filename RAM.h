@@ -1,54 +1,45 @@
-#include "Arduino.h"
-
 class RAM {
 public:
 
-  const byte SELECT = 10;
-
   RAM() {
-    pinMode(SCK, OUTPUT);
-    pinMode(MOSI, OUTPUT);
-    pinMode(MISO, INPUT);
-    pinMode(SELECT, OUTPUT);
-    digitalWrite(SELECT, HIGH); //disable
+    pinMode(RAM_SELECT, OUTPUT);
+  }
+
+  byte readByte(int address) {
+    digitalWrite(RAM_SELECT, LOW);
+    SPI.transfer(3); //read
+    SPI.transfer((address >> 16) & 255);
+    SPI.transfer((address >> 8) & 255);
+    SPI.transfer((address) & 255);
+    byte value = SPI.transfer(0x00);
+    digitalWrite(RAM_SELECT, HIGH);
+    bus.data = value;
+    bus.address = address;
+    bitSet(bus.state, MEMR);
+    return value;
   }
   
-  byte read(uint16_t address) {
-    digitalWrite(SELECT, LOW);
-    shiftOut(MOSI, SCK, MSBFIRST, 3); //READ
-    shiftOut(MOSI, SCK, MSBFIRST, (address >> 16) & 255);
-    shiftOut(MOSI, SCK, MSBFIRST, (address >> 8) & 255);
-    shiftOut(MOSI, SCK, MSBFIRST, address);
-    byte b = shiftIn(MISO, SCK, MSBFIRST);
-    digitalWrite(SELECT, HIGH);
-    LEDs.address = address;  
-    LEDs.data = b;
-    LEDs.write(); //updates LEDs during memory access
-    return b;
+  void writeByte(int address, byte value) {
+    digitalWrite(RAM_SELECT, LOW);
+    SPI.transfer(2); //write
+    SPI.transfer((address >> 16) & 255);
+    SPI.transfer((address >> 8) & 255);
+    SPI.transfer((address) & 255);
+    SPI.transfer(value);
+    digitalWrite(RAM_SELECT, HIGH);
+    bus.data = value;
+    bus.address = address;
+    //panel.write();
   }
-
-  uint16_t read16(uint16_t address) {
-    return read(address) | (read(address+1)<<8);
+  
+  int readWord(int address) {
+    return readByte(address) | (readByte(address + 1) << 8);
   }
-
-  void write(uint16_t address, byte data) {
-    digitalWrite(SELECT, LOW);
-    shiftOut(MOSI, SCK, MSBFIRST, 2); //WRITE
-    shiftOut(MOSI, SCK, MSBFIRST, (address >> 16) & 255);
-    shiftOut(MOSI, SCK, MSBFIRST, (address >> 8) & 255);
-    shiftOut(MOSI, SCK, MSBFIRST, address);
-    shiftOut(MOSI, SCK, MSBFIRST, data);
-    digitalWrite(SELECT, HIGH);
-    LEDs.address = address;  
-    LEDs.data = data;
-    LEDs.write(); //updates LEDs during memory access
+  
+  void writeWord(uint16_t address, int value) {
+    writeByte(address, value & 0xff);
+    writeByte(address + 1, (value >> 8) & 0xff);
   }
-
-  void write16(uint16_t address, uint16_t data) {
-    write(address, data & 0xff);
-    write(address+1, (data >> 8) & 0xff);
-  }
-
+  
 } RAM;
-
 

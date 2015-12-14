@@ -1,121 +1,82 @@
-#include "SoftwareSerial.h"
-
-char printbuf[20];
-
-SoftwareSerial softserial(2,3);
-
-#define LOG(s,x...) { sprintf(printbuf,s,x); Serial.println(printbuf); softserial.println(printbuf); }
-
 #include <SPI.h>
 #include <SD.h>
-#include "LEDs.h"
+#include <SoftwareSerial.h>
+
+SoftwareSerial softserial(2,3);
+const byte SD_SELECT = 4;
+const byte CLOCK = 5;
+const byte LED_SELECT = 8;
+const byte LED_DATA = 9;
+const byte RAM_SELECT = 10;
+const byte SW_SELECT = 6;
+const byte SW_DATA = 7;
+
+extern "C" {
+  #include "i8080.h"
+}
+
+enum State { 
+  HLDA, WAIT, INTE, PROT, MEMR, INP, 
+  M1, OUT, HLTA, STACK, WO, INT };
+
+struct {
+  int address;
+  byte data;
+  byte state;
+} bus;
+
 #include "RAM.h"
-#include "Switches.h"
-#include "CPU.h"
-#include "ROM.h"
-#include "Debugger.h"
+#include "Panel.h"
+#include "DiskController.h"
+#include "IO.h"
+#include "Loader.h"
 
-
-void setup() { 
-
-  Serial.begin(9600);
+void setup() {
+  Serial.begin(115200);
   softserial.begin(9600);
-  stop();
-  examine(); //set pc to value of switches and show data on that address
-  ROM.loadBasicFromSD();
+  SPI.begin();
+  bus.state = 0x2; //all flags off except STOP
+  bus.address = 0;
+  bus.data = 0;
 }
 
 void loop() {
-  Switches.read();
-  
-  if (Switches.onRun()) run();
-  if (Switches.onStop()) stop();
-  if (Switches.onSingleStep()) singleStep();
-  if (Switches.onExamine()) examine();
-  if (Switches.onExamineNext()) examineNext();
-  if (Switches.onDeposit()) deposit();
-  if (Switches.onDepositNext()) depositNext();
-  if (Switches.onReset()) reset();
-  if (Switches.onClear()) clear();
-  if (Switches.onAux1()) aux1();
-  if (Switches.onAux2()) aux2();
-  
-  if (!CPU.wait && debug.breakpoint == CPU.pc) {
-    Serial.print(F("Hit breakpoint at "));
-    LOG("%04x",CPU.pc);
-    stop();
-  }
-
-  if (!CPU.wait) {
-    // debug.unassemble_addr = CPU.pc;
-    // debug.unassemble();
-    CPU.step();
-    // debug.registersAndFlags();
-  }
-
-  if (debug.enabled) {
-    debug.update();
-  }
+  bitClear(bus.state,MEMR); //flag set by RAM.readByte()
+  bitClear(bus.state,M1);  //flag set by step()
+  bitClear(bus.state,OUT); //flag set by IO.write()
+  bitClear(bus.state,INP); //flag set by IO.read()
     
-  LEDs.setFlag(LEDs.WAIT,CPU.wait);
-  LEDs.setFlag(LEDs.M1,CPU.m1);
-  LEDs.setFlag(LEDs.MEMR,CPU.memr);
-  LEDs.setFlag(LEDs.INTE,CPU.flags & CPU.IF); //IE / interrupts enabled
-  LEDs.setFlag(LEDs.INP,CPU.opcode == 0xDB);
-  LEDs.setFlag(LEDs.OUT,CPU.opcode == 0xD3);
-  LEDs.write();
+  panel.readSwitches();
   
-//  delay(100);
-}
-
-void examine() { 
-  CPU.pc = Switches.ax; //examine updates the program counter
-  LEDs.data = CPU.fetch();
-}
-
-void examineNext() {
-  CPU.pc++;
-  LEDs.data = CPU.fetch();
-}
-
-void deposit() {
-  CPU.store(Switches.ax);
-  LEDs.data = CPU.fetch();
-}
-
-void depositNext() {
-  CPU.pc++;
-  CPU.store(Switches.ax);
-  LEDs.data = CPU.fetch();
-}
-
-void reset() {
-  CPU.pc = 0;
-  LEDs.data = CPU.fetch();
-}
-
-void clear() {
+  if (panel.onStop()) bitSet(bus.state,WAIT);
+  if (panel.onRun()) bitClear(bus.state,WAIT);
+  if (panel.onSingleStep()) i8080_instruction();
+  if (panel.onExamine()) examine(panel.ax);
+  if (panel.onExamineNext()) examine(i8080_pc()+1);
+  if (panel.onDeposit()) deposit(i8080_pc(),panel.ax);
+  if (panel.onDepositNext()) deposit(i8080_pc()+1,panel.ax);
+  if (panel.onReset()) examine(0);
+  if (panel.onAux1Up()) loader.loadKillbits();
+  if (panel.onAux1Down()) loader.loadFile("4KBAS32.BIN", 0);
+  if (panel.onAux2Down()) {
+    loader.loadFile("88DSKROM.BIN", 0xff00);
+    disk.mount(disk.disk1,"cpm63k.dsk");
+    disk.mount(disk.disk2,"zork.dsk");
+    examine(0xff00);
+  }
   
+  if (!bitRead(bus.state,WAIT)) i8080_instruction();
+  
+  panel.writeLEDs();
 }
 
-void singleStep() {
-  CPU.step();
+void examine(uint16_t address) {
+  i8080_jump(address); //set program counter
+  RAM.readByte(address);
 }
 
-void run() {
-  CPU.wait = false;
-  debug.stop();
+void deposit(uint16_t address, byte data) {
+  i8080_jump(address); //set program counter
+  RAM.writeByte(address,data);
 }
 
-void stop() {
-  CPU.wait = true;
-  debug.start();
-}
-
-void aux1() {
-
-}
-
-void aux2() {
-  ROM.loadBasicFromSD();
-}

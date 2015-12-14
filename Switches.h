@@ -24,6 +24,10 @@ public:
     byte ah = shiftIn(DATA, SCK, MSBFIRST);
     byte cl = shiftIn(DATA, SCK, MSBFIRST);
     byte ch = shiftIn(DATA, SCK, MSBFIRST);
+    // byte al = SPI.transfer(0x00);
+    // byte ah = SPI.transfer(0x00);
+    // byte cl = SPI.transfer(0x00);
+    // byte ch = SPI.transfer(0x00);
     _cx = cx; //remember previous value
     ax = (ah<<8) + al;
     cx = (ch<<8) + cl;

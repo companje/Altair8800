@@ -20,6 +20,10 @@ public:
 
   void write() {
     digitalWrite(SELECT, LOW);
+    // SPI.transfer(flags);
+    // SPI.transfer((address>>8) & 255);
+    // SPI.transfer(address & 255);
+    // SPI.transfer(data);
     shiftOut(DATA, SCK, MSBFIRST, flags);
     shiftOut(DATA, SCK, MSBFIRST, address >> 8);
     shiftOut(DATA, SCK, MSBFIRST, address);

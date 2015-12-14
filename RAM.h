@@ -21,13 +21,14 @@ public:
     shiftOut(MOSI, SCK, MSBFIRST, address);
     byte b = shiftIn(MISO, SCK, MSBFIRST);
     digitalWrite(SELECT, HIGH);
-    
-    //updates LEDs during memory access
     LEDs.address = address;  
     LEDs.data = b;
-    LEDs.write();
-    
+    LEDs.write(); //updates LEDs during memory access
     return b;
+  }
+
+  uint16_t read16(uint16_t address) {
+    return read(address) | (read(address+1)<<8);
   }
 
   void write(uint16_t address, byte data) {
@@ -38,11 +39,14 @@ public:
     shiftOut(MOSI, SCK, MSBFIRST, address);
     shiftOut(MOSI, SCK, MSBFIRST, data);
     digitalWrite(SELECT, HIGH);
-    
-    //updates LEDs during memory access
     LEDs.address = address;  
     LEDs.data = data;
-    LEDs.write();
+    LEDs.write(); //updates LEDs during memory access
+  }
+
+  void write16(uint16_t address, uint16_t data) {
+    write(address, data & 0xff);
+    write(address+1, (data >> 8) & 0xff);
   }
 
 } RAM;

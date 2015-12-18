@@ -31,26 +31,20 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-#ifndef I8080_H
-#define I8080_H
+#ifndef I8080_HAL_H
+#define I8080_HAL_H
 
-extern void i8080_init(void);
-extern int i8080_instruction(void);
+extern int i8080_hal_memory_read_word(int addr);
+extern void i8080_hal_memory_write_word(int addr, int word);
 
-extern void i8080_jump(int addr);
-extern int i8080_pc(void);
+extern int i8080_hal_memory_read_byte(int addr);
+extern void i8080_hal_memory_write_byte(int addr, int byte);
 
-extern int i8080_regs_bc(void);
-extern int i8080_regs_de(void);
-extern int i8080_regs_hl(void);
-extern int i8080_regs_sp(void);
+extern int i8080_hal_io_input(int port);
+extern void i8080_hal_io_output(int port, int value);
 
-extern int i8080_regs_a(void);
-extern int i8080_regs_b(void);
-extern int i8080_regs_c(void);
-extern int i8080_regs_d(void);
-extern int i8080_regs_e(void);
-extern int i8080_regs_h(void);
-extern int i8080_regs_l(void);
+extern void i8080_hal_iff(int on);
+
+extern unsigned char* i8080_hal_memory(void);
 
 #endif

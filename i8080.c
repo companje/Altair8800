@@ -32,10 +32,11 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 #include "i8080.h"
-//#include "i8080_hal.h"
+#include "i8080_hal.h"
 
 #define RD_BYTE(addr) i8080_hal_memory_read_byte(addr)
 #define RD_WORD(addr) i8080_hal_memory_read_word(addr)
+
 #define WR_BYTE(addr, value) i8080_hal_memory_write_byte(addr, value)
 #define WR_WORD(addr, value) i8080_hal_memory_write_word(addr, value)
 
@@ -258,9 +259,7 @@ struct i8080 {
     PC = (addr);                                \
 }
 
-//#define PARITY(reg) parity_table[(reg)]
-#define PARITY(reg) getParity(reg)
-
+#define PARITY(reg) parity_table[(reg)]
 
 static struct i8080 cpu;
 
@@ -270,33 +269,27 @@ static uns8 work8;
 static int index;
 static uns8 carry, add;
 
-//const int parity_table[] = {
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-//    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-//};
+int parity_table[] = {
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
+    1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
+};
 
-int getParity(int val) {
-  val ^= val >> 4;
-  val &= 0xf;
-  return !((0x6996 >> val) & 1);
-}
-
-const int half_carry_table[] = { 0, 0, 1, 0, 1, 0, 1, 1 };
-const int sub_half_carry_table[] = { 0, 1, 1, 1, 0, 0, 0, 1 };
+int half_carry_table[] = { 0, 0, 1, 0, 1, 0, 1, 1 };
+int sub_half_carry_table[] = { 0, 1, 1, 1, 0, 0, 0, 1 };
 
 void i8080_init(void) {
     C_FLAG = 0;
@@ -795,7 +788,7 @@ static int i8080_execute(int opcode) {
             E = H;
             break;
 
-        case 0x5D:            /* mov c, l */
+        case 0x5D:             /* mov c, l */
             cpu_cycles = 5;
             E = L;
             break;
@@ -1771,4 +1764,3 @@ int i8080_regs_h(void) {
 int i8080_regs_l(void) {
     return L;
 }
-

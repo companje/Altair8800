@@ -1,21 +1,25 @@
+#ifdef ARDUINO
+
 extern "C" {
   
+  #include "RAM.h"
+    
   //read/write byte
   int i8080_hal_memory_read_byte(int addr) {
-    return RAM.readByte(addr);
+    return RAM::readByte(addr);
   }
   
   void i8080_hal_memory_write_byte(int addr, int value) {
-    RAM.writeByte(addr,value);
+    RAM::writeByte(addr,value);
   }
   
   //read/write word
   int i8080_hal_memory_read_word(int addr) {
-    return RAM.readWord(addr);
+    return RAM::readWord(addr);
   }
   
   void i8080_hal_memory_write_word(int addr, int value) {
-    RAM.writeWord(addr,value);
+    RAM::writeWord(addr,value);
   }
   
   //input/output
@@ -32,3 +36,5 @@ extern "C" {
     //nothing
   }
 }
+
+#endif

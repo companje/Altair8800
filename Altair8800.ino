@@ -1,13 +1,12 @@
 #include <SPI.h>
 #include <SD.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 
-SoftwareSerial softserial(2,3);
+//SoftwareSerial softserial(2,3);
 const byte SD_SELECT = 4;
 const byte CLOCK = 5;
 const byte LED_SELECT = 8;
 const byte LED_DATA = 9;
-const byte RAM_SELECT = 10;
 const byte SW_SELECT = 6;
 const byte SW_DATA = 7;
 
@@ -29,12 +28,20 @@ struct {
 #include "Panel.h"
 #include "DiskController.h"
 #include "IO.h"
+#include "HAL.h"
 #include "Loader.h"
 
 void setup() {
   Serial.begin(115200);
-  softserial.begin(9600);
+//  softserial.begin(9600);
   SPI.begin();
+  pinMode(LED_SELECT, OUTPUT);
+  pinMode(LED_DATA, OUTPUT);
+  pinMode(CLOCK, OUTPUT);
+  digitalWrite(LED_SELECT, HIGH); //disable
+  pinMode(SW_SELECT, OUTPUT);
+  pinMode(SW_DATA, INPUT);
+  digitalWrite(SW_SELECT, HIGH); //disable
   bus.state = 0x2; //all flags off except STOP
   bus.address = 0;
   bus.data = 0;
@@ -72,11 +79,11 @@ void loop() {
 
 void examine(uint16_t address) {
   i8080_jump(address); //set program counter
-  RAM.readByte(address);
+  RAM::readByte(address);
 }
 
 void deposit(uint16_t address, byte data) {
   i8080_jump(address); //set program counter
-  RAM.writeByte(address,data);
+  RAM::writeByte(address,data);
 }
 

@@ -7,23 +7,24 @@ public:
     }
   }
 
-  int loadFile(char *filename, int offset = 0) {
+  int loadFile(const char filename[], int offset = 0) {
     File file = SD.open(filename);
     if (!file) {
       Serial.println("ERR:Load");
       return -2; 
     }
     while (file.available()) {
-      RAM.writeByte(offset++, file.read());
-      panel.writeLEDs();
+      RAM::writeByte(offset++, file.read());
+//      panel.writeLEDs();
     }
     file.close();
+    return 0;
   }
     
   void loadData(byte *program, int s, int offset = 0) {
     for (uint16_t i=0; i<s; i++) {
-      RAM.writeByte(i+offset,program[i]);
-      panel.writeLEDs();
+      RAM::writeByte(i+offset,program[i]);
+      //panel.writeLEDs();
     }
   }
       

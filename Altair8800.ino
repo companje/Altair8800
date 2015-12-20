@@ -19,8 +19,8 @@ const byte SW_SELECT = 6;
 const byte SW_DATA = 7;
 
 enum State { 
-  HLDA, WAIT, INTE, PROT, MEMR, INP, 
-  M1, OUT, HLTA, STACK, WO, INT };
+  HLDA, WAIT, WO /*was INTE*/, STACK /*PROT*/, MEMR, INP, 
+  M1, OUT, HLTA, PROT /*was STACK*/, INTE /*was WO*/, INT };
 
 enum Control { STOP, SINGLE_STEP, EXAMINE, DEPOSIT, 
     RUN, SINGLE_STEP_, EXAMINE_NEXT, DEPOSIT_NEXT, 
@@ -114,7 +114,7 @@ void output(int port, byte value) {
     case 0x12: // ????
       break;
     default:
-      Serial.print("out ");
+//      Serial.print("out ");
       Serial.println(port);
       while(1);
       break;
@@ -136,6 +136,7 @@ byte readByte(int address) {
   bus.data = value;
   bus.address = address;
   bitSet(bus.state, MEMR);
+  if (address==i8080_regs_sp()) bitSet(bus.state, STACK);
   return value;
 }
 
@@ -153,6 +154,8 @@ void writeByte(int address, byte value) {
   PORTB |= B0100;
   bus.data = value;
   bus.address = address;
+  bitClear(bus.state,WO); //inverted logic for write LED
+  if (address==i8080_regs_sp()) bitSet(bus.state, STACK);
 //  writeLEDs();
 }
 
@@ -280,7 +283,7 @@ void loadCPM() {
   disk_drive.disk1.fp = SD.open("cpm63k.dsk", FILE_WRITE);
   disk_drive.disk2.fp = SD.open("zork.dsk", FILE_WRITE);
   if(!disk_drive.disk2.fp || !disk_drive.disk1.fp)
-    Serial.println("ERR:dsk");
+//    Serial.println("ERR:dsk");
   disk_drive.nodisk.status = 0xff;
   examine(0xff00);
 }
@@ -332,7 +335,9 @@ void loop() {
   bitClear(bus.state,M1);  //flag set by step()
   bitClear(bus.state,OUT); //flag set by output()
   bitClear(bus.state,INP); //flag set by input()
- 
+  bitSet(bus.state,WO); //flag CLEARED by writeByte() inverted logic
+  bitClear(bus.state, STACK); //set by readByte and writeByte if addr==SP
+
   readSwitches();
     
   if (onRelease(RUN)) run();
@@ -345,7 +350,7 @@ void loop() {
   if (onRelease(RESET)) examine(0);
   if (onRelease(AUX1_UP)) loadFile("killbits.bin",0);
   if (onRelease(AUX1_DOWN)) loadFile("4KBAS32.BIN", 0);
-  if (onRelease(AUX2_UP)) loadCPM();
+  if (onRelease(AUX2_DOWN)) loadCPM();
   
   if (!bitRead(bus.state,WAIT)) {
     for (int i=0; i < 50; i++) 

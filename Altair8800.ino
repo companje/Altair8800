@@ -10,13 +10,13 @@ extern "C" {
 #include "disk.h"
 
 SoftwareSerial softserial(2,3);
-const byte RAM_SELECT = 10;
 const byte SD_SELECT = 4;
 const byte CLOCK = 5;
-const byte LED_SELECT = 8;
-const byte LED_DATA = 9;
 const byte SW_SELECT = 6;
 const byte SW_DATA = 7;
+const byte LED_SELECT = 8;
+const byte LED_DATA = 9;
+const byte RAM_SELECT = 10;
 
 enum State { 
   HLDA, WAIT, WO /*was INTE*/, STACK /*PROT*/, MEMR, INP, 

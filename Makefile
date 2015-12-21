@@ -14,4 +14,4 @@ altair8800: $(OBJECTS)
 .PHONY: all test clean local
 
 clean:
-	rm *.o rm local/*.o altair8800
+	rm *.o local/*.o altair8800

@@ -80,8 +80,8 @@ run();
 ```
 
 More ROMs and other files can be found here:
-- [http://www.vintagecomputer.net/mits/Software](VintageComputer.org)
-- [http://altairclone.com/downloads/](AltairClone.com)
+- [VintageComputer.org](http://www.vintagecomputer.net/mits/Software)
+- [AltairClone.com](http://altairclone.com/downloads/)
 
 # Disk Images
 Beside ROM files you can also find DSK files. DSK files contain a disk image which can be read by a piece of code called the Disk Bootloader (88dskrom.bin). The Altair Disk Bootloader is a ROM chip with 255 bytes of code loaded at address 0xFF00. The Disk Bootloader executes IN and OUT instructions and this way communicates with the disk drive(s). The disks are simulated as files on the SD-card and can be mounted/selected from Arduino code.
@@ -96,8 +96,8 @@ run();
 
 # Intel 8080 instructions
 These 2 resources where handy when I was trying to create an Intel 8080 emulator. It shows how the instructions correspond to the opcodes.
-- [http://pastraiser.com/cpu/i8080/i8080_opcodes.html](Intel 8080 instruction set)
-- [http://www.classiccmp.org/dunfield/r/8080.txt](8080 instruction encoding).
+- [Intel 8080 instruction set](http://pastraiser.com/cpu/i8080/i8080_opcodes.html)
+- [8080 instruction encoding](http://www.classiccmp.org/dunfield/r/8080.txt).
 
 [1]: https://en.wikipedia.org/wiki/The_Innovators:_How_a_Group_of_Inventors,_Hackers,_Geniuses,_and_Geeks_Created_the_Digital_Revolution
 [2]: http://www.charlespetzold.com/code/

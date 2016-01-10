@@ -97,7 +97,7 @@ run();
 # Intel 8080 instructions
 These 2 resources where handy when I was trying to create an Intel 8080 emulator. It shows how the instructions correspond to the opcodes.
 - [Intel 8080 instruction set](http://pastraiser.com/cpu/i8080/i8080_opcodes.html)
-- [8080 instruction encoding](http://www.classiccmp.org/dunfield/r/8080.txt).
+- [8080 instruction encoding](http://www.classiccmp.org/dunfield/r/8080.txt)  
 
 [1]: https://en.wikipedia.org/wiki/The_Innovators:_How_a_Group_of_Inventors,_Hackers,_Geniuses,_and_Geeks_Created_the_Digital_Revolution
 [2]: http://www.charlespetzold.com/code/
